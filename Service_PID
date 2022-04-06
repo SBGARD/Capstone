@@ -1,0 +1,96 @@
+# Removes any ERRORS from displaying on screen. NOT needed, but left in for cleaner input
+$ErrorActionPreference = 'silentlycontinue'
+
+# Variables
+$Time = Get-Date
+$SERVER = $env:computername 
+$ErrorCode = Get-Random
+
+# Path of where the logs are stored
+$path = "$env:USERPROFILE\AppData\Local\INFT3000\"
+
+$BASELINE = Get-ChildItem "$path\BASELINE*"
+
+# Logic to determine if the directory exists. If not, create one
+If(!(test-path $path))
+{
+      # Null used to prevent console print out
+      $null = New-Item -ItemType Directory -Force -Path $path 
+   }
+
+# Logic to determine If a BASEFILE exists 
+if ($BASELINE) {
+    # Used for Testing only #Write-Host "Found one."
+    
+    # Command to gather service information
+    $id = Get-WmiObject -Class Win32_Service | Select-Object Name, PathName, ProcessId, ServiceType, Description, State, @{ l='DateStamp'; e={ $Time } }, @{ l='ErrorCode'; e={ $ErrorCode } }
+    
+    # Variable of Current Log file
+    $CURRENT = "$path\CURRENT($SERVER)-$(get-date -f yyyy-MM-dd).csv" 
+    
+    # Export contents of command to CSV file
+    write-output $id | Export-Csv $CURRENT -NoTypeInformation #-Append
+    
+    # Importing variables as CSV objects
+    $BaselineCSV = Import-CSV -Path "$BASELINE"
+    $CurrentCSV = Import-CSV -Path "$CURRENT"
+
+    # Compares both CSV files and outputs any addition over the BASELINE
+    $CompareCSV = Compare-Object $BaselineCSV $CurrentCSV -Property PathName -IncludeEqual -PassThru
+    $output = ForEach ($item in $compareCSV) {
+
+        If ($item.SideIndicator -eq "=>") {
+            
+            # Creates custom Headers to match original files
+            [pscustomobject]@{
+                "Name"     = $item.'Name'
+                "PathName" = $item.'PathName'
+                "ProcessId" = $item.'ProcessId'
+                "ServiceType" = $item.'ServiceType'
+                "Description" = $item.'Description'
+                "State" = $item.'State'
+                "DateStamp" = $item.'DateStamp'
+                "ErrorCode" = $item.'ErrorCode'
+            }
+        
+        
+        
+        }
+    }
+
+# Outputs differences to new file
+$output | Export-CSV -Path "$path\NEWSERVICES($SERVER).csv" -NoTypeInformation -Append
+
+# Imports newservices file for the purpse of pulling out the error code
+$inFile = Import-Csv "$path\NEWSERVICES($SERVER).csv"
+$targetCell = $inFile.ErrorCode[-1]
+
+# Logic to determine if the file has a new line, if so send email
+if($targetCell) {
+    Send-MailMessage -SMTPServer 192.168.208.130 -To sbgard@protonmail.com -From no-reply@sbgard.com -Subject "New Service Detected on PC - $SERVER" -Body "A New Service has been detected. Data log included as attachment." "`n" "PC - $SERVER" "`n" "Error reference - $targetCell" "`n" "`n" "`n" "This email was sent from an account that is not monitored. For IT assistance please contact your SBGARD representative." -Attachments "$path\NEWSERVICES($SERVER).csv"
+}
+
+# Local notification, not needed but left in for notes
+#[reflection.assembly]::loadwithpartialname('System.Windows.Forms')
+#[reflection.assembly]::loadwithpartialname('System.Drawing')
+#$notify = new-object system.windows.forms.notifyicon
+#$notify.icon = [System.Drawing.SystemIcons]:: Warning
+#$notify.visible = $true
+#$notify.showballoontip(10,'WARNING',$targetCell,[system.windows.forms.tooltipicon]::None)
+}
+
+# Create BASELINE file
+else {
+    $id = Get-WmiObject -Class Win32_Service | Select-Object Name, PathName, ProcessId, ServiceType, Description, State, @{ l='DateStamp'; e={ $Time } }
+    $BASELINE = "$path\BASELINE($SERVER)-$(get-date -f yyyy-MM-dd).csv" 
+    write-output $id | Export-Csv $BASELINE -NoTypeInformation
+    
+    # Identifies schedule task name, logic to determine to create or not
+    Get-ScheduledTask -TaskName "ServiceCheck" -ErrorAction SilentlyContinue -OutVariable task
+    if (!$task) {
+        $null = schtasks.exe /create /tn "ServiceCheck" /tr "ServiceCheck.exe" /sc minute /mo 1
+    }
+}
+
+#Removes variables for cleanup
+Remove-Variable * -ErrorAction SilentlyContinue
