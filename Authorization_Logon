@@ -1,0 +1,79 @@
+<#
+Authorization_Logon Pseudocode
+
+Author(s): Shane Stoyles
+
+Things this tool does:
+1.	Create list of approved members
+2.	Create a scripted alert (“alert.sh”) that will be used to notify admins
+3.	Notify on strange logons of approved members outside of normal working hours
+4.	Notify on logons of non-approved members
+5.	Runs as a regular scheduled task
+
+Pseudocode
+1.	Create “alert.sh” script that notifies via message box
+        a.	$wshell = New-Object -ComObject Wscript.Shell
+        b.	$Output = $wshell.Popup(alertText)
+        c.	Set New logins to a variable called capturedLogin
+        d.	alertSusLogin = “ALERT: Suspicious login detected on machine:{0}, from unauthorized user:{1}. Admin investigation recommended.” -f monitoredHostname, capturedLogin
+        e.	alertSusHours = “ALERT: User login detected outside of normal working hours on machine:{0}, from authorized user:{1}. Admin investigation may be required.” -f monitoredHostname, capturedLogin
+
+2.	Create list with entries of approved usernames
+        a.	$approvedUsers = @(“user1, user2, user3”)
+        b.	Find hostname of login and compare against list
+        c.	If hostname is on list:
+                i.	Check if hostname is working within their set hours
+                ii.	If hostname is working within set hours continue
+                iii.	If host name is working outside hours, send “alertSusHours” to Admins
+        d.	If hostname is not on list:
+                i.	Send “alertSusLogin” to Admins
+
+3.	Have a dictionary key set with users and their approved working hours (hashtables)
+        a.	$htable = @{HostName=<name>;WorkHours=<range of hours>}
+
+4.	Run script as regularly scheduled task
+        a.	Windows task scheduler
+        b.	Right click > schedule task
+        c.	Run whether use is logged on or not
+        d.	Create trigger
+        e.	Load the script	
+
+#>
+
+#command to run script
+#Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+#gets currently logged in user
+[string]$logonUser = (Get-WMIObject -ClassName Win32_ComputerSystem).Username
+Write-Output $logonUser
+$logonUser.GetType()
+
+#approved username list
+$approvedUsers = @(
+"AD\W0438298",
+"AD\W0446772",
+"AD\W0437644",
+"AD\W0441010",
+"AD\W0438200",
+"AD\W0448051"
+)
+Write-Output $approvedUsers
+
+#if/else statement comparing logon to approved list and alerts if logon is unapproved.
+if($approvedUsers.Contains($logonUser))
+{
+    write-host("User good")
+    continue
+}
+else 
+{
+    write-host("User bad")
+    $hostname = iex hostname
+    $ipaddr = (Get-NetIPAddress | Where-Object {$_.AddressState -eq "Preferred" -and $_.ValidLifetime -lt "24:00:00"}).IPAddress
+
+    $SusAlert = [String]::Format(“ALERT: Suspicious login detected on machine: $hostname ip: $ipaddr, from unauthorized user:$logonUser. Admin investigation recommended.")
+    [System.Windows.MessageBox]::Show($SusAlert)
+    
+    #Send-MailMessage -SMTPServer 192.168.208.130 -To dave.vandorsten@gmail.com -From ITsupport@example.ca -Subject "Suspicious Login Detected" -Body $SusAlert
+
+}
