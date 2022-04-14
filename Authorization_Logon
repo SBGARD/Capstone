@@ -74,6 +74,6 @@ else
     $SusAlert = [String]::Format(“ALERT: Suspicious login detected on machine: $hostname ip: $ipaddr, from unauthorized user:$logonUser. Admin investigation recommended.")
     [System.Windows.MessageBox]::Show($SusAlert)
     
-    #Send-MailMessage -SMTPServer 192.168.208.130 -To dave.vandorsten@gmail.com -From ITsupport@example.ca -Subject "Suspicious Login Detected" -Body $SusAlert
+    #Send-MailMessage -SMTPServer 192.168.208.130 -To sbgard@protonmail.com -From no-reply@sbgard.com -Subject "Suspicious Login Detected" -Body $SusAlert
 
 }
