@@ -19,11 +19,11 @@ The tools will be developed for the Windows OS platform. Pseudocode will be writ
 
 2.1 Authorization_Logon
 
-STUFF
+A script that could accurately alert on if a logged in user was part of an approved list of users and based on the condition, either continue or alert Admins on the unauthorized logon. Another feature we wanted in our script was to make the alerts that the admins will receive to be informative and dynamic by supplying details in it like the user’s AD username, the machine host name, and the IP address. The script is sent to the Administrator shared email account at sbgard@protonmail.com via an SMTP server that the Capstone group created.
 
 2.2 Service_PID
 
-STUFF
+An application that regularly scans the computers running or installed services and compares them to the generated baseline database created on installation. If any discrepancies are detected a log is generated and documented within a custom database. For alerting, the application then collects the relevant information and sends via email to the corporate IT support team with ticketing references.
 
 2.3 Routing_Table
 
